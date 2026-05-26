@@ -219,12 +219,64 @@ async function postCommentsAsReview(
   }
 }
 
+async function postSummaryOnlyReview(
+  octokit: ReturnType<typeof createOctokit>["rest"],
+  owner: string,
+  repo: string,
+  pull_number: number,
+  body: string,
+): Promise<void> {
+  const pr = await octokit.pulls.get({ owner, repo, pull_number });
+  try {
+    await octokit.pulls.createReview({
+      owner,
+      repo,
+      pull_number,
+      commit_id: pr.data.head.sha,
+      event: "COMMENT",
+      body,
+    });
+    console.log("  submitted summary-only PR review (no inline comments)");
+  } catch (e) {
+    console.log(
+      `  failed to submit summary-only review: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+}
+
+async function maybePostSummaryOnly(): Promise<void> {
+  if (!existsSync(SUMMARY_PATH)) return;
+  const body = readFileSync(SUMMARY_PATH, "utf8").trim();
+  if (!body) return;
+
+  const githubToken = process.env.GITHUB_TOKEN;
+  const owner = process.env.REPO_OWNER;
+  const repo = process.env.REPO_NAME;
+  const prNumber = process.env.PR_NUMBER;
+  if (!githubToken || !owner || !repo || !prNumber) {
+    console.log(
+      "::warning::Summary file present but missing GITHUB_TOKEN/REPO_OWNER/REPO_NAME/PR_NUMBER — cannot post summary",
+    );
+    return;
+  }
+
+  const octokit = createOctokit(githubToken).rest;
+  await postSummaryOnlyReview(
+    octokit,
+    owner,
+    repo,
+    parseInt(prNumber, 10),
+    body,
+  );
+}
+
 async function main() {
   let raw: string;
   try {
     raw = readFileSync(BUFFER_PATH, "utf8");
   } catch {
     console.log("No buffered inline comments");
+    await maybePostSummaryOnly();
     return;
   }
 
@@ -235,6 +287,7 @@ async function main() {
 
   if (comments.length === 0) {
     console.log("No buffered inline comments");
+    await maybePostSummaryOnly();
     return;
   }
 
@@ -261,6 +314,7 @@ async function main() {
   }
 
   if (candidates.length === 0) {
+    await maybePostSummaryOnly();
     return;
   }
 
@@ -284,6 +338,7 @@ async function main() {
 
   if (toPost.length === 0) {
     console.log("No real comments to post");
+    await maybePostSummaryOnly();
     return;
   }
 
