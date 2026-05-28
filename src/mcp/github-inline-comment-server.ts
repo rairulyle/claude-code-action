@@ -79,10 +79,13 @@ server.tool(
       .boolean()
       .optional()
       .describe(
-        "Set true to post immediately. When omitted, the call is buffered " +
-          "and classified after the session completes — real review comments " +
-          "post, test/probe comments are dropped. Set false to buffer and " +
-          "never post. Only set true when posting final review comments.",
+        "Leave omitted for normal review comments. All calls are buffered " +
+          "and submitted together as ONE grouped GitHub PR Review at the end " +
+          "of the session (with the summary body from /tmp/inline-review-summary.md). " +
+          "Test/probe comments are dropped by the post-step classifier. Set " +
+          "false to buffer and never post. Do not set true — it bypasses the " +
+          "batched review and posts the comment as a standalone, ungrouped " +
+          "review comment.",
       ),
   },
   async ({ path, body, line, startLine, side, commit_id, confirmed }) => {
