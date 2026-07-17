@@ -106,7 +106,8 @@ describe("parseSdkOptions", () => {
       const result = parseSdkOptions(options);
 
       expect(result.sdkOptions.extraArgs?.["allowedTools"]).toBeUndefined();
-      expect(result.sdkOptions.extraArgs?.["model"]).toBe("claude-3-5-sonnet");
+      expect(result.sdkOptions.extraArgs?.["model"]).toBeUndefined();
+      expect(result.sdkOptions.model).toBe("claude-3-5-sonnet");
     });
 
     test("should handle hyphenated --allowed-tools flag", () => {
@@ -366,7 +367,8 @@ describe("parseSdkOptions", () => {
       );
       expect(mcpConfig.mcpServers).toHaveProperty("server1");
       expect(mcpConfig.mcpServers).toHaveProperty("server2");
-      expect(result.sdkOptions.extraArgs?.["model"]).toBe("claude-3-5-sonnet");
+      expect(result.sdkOptions.extraArgs?.["model"]).toBeUndefined();
+      expect(result.sdkOptions.model).toBe("claude-3-5-sonnet");
     });
 
     test("should handle real-world scenario: action config + user config", () => {
@@ -402,6 +404,46 @@ describe("parseSdkOptions", () => {
     });
   });
 
+  describe("add-dir handling", () => {
+    test("should accumulate multiple add-dir flags into additionalDirectories", () => {
+      const options: ClaudeOptions = {
+        claudeArgs: '--add-dir "/path/to/dir-a"\n--add-dir "/path/to/dir-b"',
+      };
+
+      const result = parseSdkOptions(options);
+
+      expect(result.sdkOptions.additionalDirectories).toEqual([
+        "/path/to/dir-a",
+        "/path/to/dir-b",
+      ]);
+      expect(result.sdkOptions.extraArgs?.["add-dir"]).toBeUndefined();
+    });
+
+    test("should map a single add-dir flag to additionalDirectories", () => {
+      const options: ClaudeOptions = {
+        claudeArgs: '--add-dir "/path/to/dir"',
+      };
+
+      const result = parseSdkOptions(options);
+
+      expect(result.sdkOptions.additionalDirectories).toEqual(["/path/to/dir"]);
+      expect(result.sdkOptions.extraArgs?.["add-dir"]).toBeUndefined();
+    });
+
+    test("should preserve other extraArgs when extracting add-dir", () => {
+      const options: ClaudeOptions = {
+        claudeArgs: '--model "claude-3-5-sonnet" --add-dir "/path/to/dir"',
+      };
+
+      const result = parseSdkOptions(options);
+
+      expect(result.sdkOptions.additionalDirectories).toEqual(["/path/to/dir"]);
+      expect(result.sdkOptions.extraArgs?.["model"]).toBeUndefined();
+      expect(result.sdkOptions.model).toBe("claude-3-5-sonnet");
+      expect(result.sdkOptions.extraArgs?.["add-dir"]).toBeUndefined();
+    });
+  });
+
   describe("other extraArgs passthrough", () => {
     test("should pass through json-schema in extraArgs", () => {
       const options: ClaudeOptions = {
@@ -425,7 +467,8 @@ describe("parseSdkOptions", () => {
 
       const result = parseSdkOptions(options);
 
-      expect(result.sdkOptions.extraArgs?.["model"]).toBe("claude-haiku");
+      expect(result.sdkOptions.extraArgs?.["model"]).toBeUndefined();
+      expect(result.sdkOptions.model).toBe("claude-haiku");
       expect(result.sdkOptions.allowedTools).toEqual(["Edit"]);
     });
 
@@ -436,7 +479,8 @@ describe("parseSdkOptions", () => {
 
       const result = parseSdkOptions(options);
 
-      expect(result.sdkOptions.extraArgs?.["model"]).toBe("claude-haiku");
+      expect(result.sdkOptions.extraArgs?.["model"]).toBeUndefined();
+      expect(result.sdkOptions.model).toBe("claude-haiku");
     });
 
     test("should not strip inline # that appears inside a quoted value", () => {
@@ -446,8 +490,34 @@ describe("parseSdkOptions", () => {
 
       const result = parseSdkOptions(options);
 
-      expect(result.sdkOptions.extraArgs?.["model"]).toBe("claude-haiku");
+      expect(result.sdkOptions.extraArgs?.["model"]).toBeUndefined();
+      expect(result.sdkOptions.model).toBe("claude-haiku");
       expect(result.sdkOptions.extraArgs?.["prompt"]).toBe("use color #ff0000");
+    });
+  });
+
+  describe("model handling", () => {
+    test("should map --model from claudeArgs to sdkOptions.model", () => {
+      const options: ClaudeOptions = {
+        claudeArgs: "--model claude-haiku-4-5-20251001",
+      };
+
+      const result = parseSdkOptions(options);
+
+      expect(result.sdkOptions.model).toBe("claude-haiku-4-5-20251001");
+      expect(result.sdkOptions.extraArgs?.["model"]).toBeUndefined();
+    });
+
+    test("should prefer direct model option over --model from claudeArgs", () => {
+      const options: ClaudeOptions = {
+        model: "claude-sonnet-4-6",
+        claudeArgs: "--model claude-haiku-4-5-20251001",
+      };
+
+      const result = parseSdkOptions(options);
+
+      expect(result.sdkOptions.model).toBe("claude-sonnet-4-6");
+      expect(result.sdkOptions.extraArgs?.["model"]).toBeUndefined();
     });
   });
 

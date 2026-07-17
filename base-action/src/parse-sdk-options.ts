@@ -19,6 +19,7 @@ const ACCUMULATING_FLAGS = new Set([
   "disallowedTools",
   "disallowed-tools",
   "mcp-config",
+  "add-dir",
 ]);
 
 // Delimiter used to join accumulated flag values
@@ -200,6 +201,17 @@ export function parseSdkOptions(options: ClaudeOptions): ParsedSdkOptions {
   // Detect if --json-schema is present (for hasJsonSchema flag)
   const hasJsonSchema = "json-schema" in extraArgs;
 
+  const modelFromClaudeArgs = extraArgs["model"] || undefined;
+  delete extraArgs["model"];
+
+  const additionalDirectories = extraArgs["add-dir"]
+    ? extraArgs["add-dir"]
+        .split(ACCUMULATE_DELIMITER)
+        .map((dir) => dir.trim())
+        .filter(Boolean)
+    : [];
+  delete extraArgs["add-dir"];
+
   // Extract and merge allowedTools from all sources:
   // 1. From extraArgs (parsed from claudeArgs - contains tag mode's tools)
   //    - Check both camelCase (--allowedTools) and hyphenated (--allowed-tools) variants
@@ -295,7 +307,7 @@ export function parseSdkOptions(options: ClaudeOptions): ParsedSdkOptions {
   // Build SDK options - use merged tools from both direct options and claudeArgs
   const sdkOptions: SdkOptions = {
     // Direct options from ClaudeOptions inputs
-    model: options.model,
+    model: options.model || modelFromClaudeArgs,
     maxTurns: options.maxTurns ? parseInt(options.maxTurns, 10) : undefined,
     allowedTools:
       mergedAllowedTools.length > 0 ? mergedAllowedTools : undefined,
@@ -304,6 +316,8 @@ export function parseSdkOptions(options: ClaudeOptions): ParsedSdkOptions {
     systemPrompt,
     fallbackModel: options.fallbackModel,
     pathToClaudeCodeExecutable: options.pathToClaudeCodeExecutable,
+    additionalDirectories:
+      additionalDirectories.length > 0 ? additionalDirectories : undefined,
 
     // Pass through claudeArgs as extraArgs - CLI handles --mcp-config, --json-schema, etc.
     // Note: allowedTools and disallowedTools have been removed from extraArgs to prevent duplicates
