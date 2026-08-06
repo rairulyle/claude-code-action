@@ -21,6 +21,7 @@ import {
   isPullRequestEvent,
   isPullRequestReviewEvent,
   isPullRequestReviewCommentEvent,
+  isWorkflowRunEvent,
 } from "../github/context";
 import type { GitHubContext } from "../github/context";
 import { detectMode } from "../modes/detector";
@@ -75,7 +76,7 @@ async function installClaudeCode(): Promise<string> {
     return customExecutable;
   }
 
-  const claudeCodeVersion = "2.1.212";
+  const claudeCodeVersion = "2.1.223";
   console.log(`Installing Claude Code v${claudeCodeVersion}...`);
 
   for (let attempt = 1; attempt <= 3; attempt++) {
@@ -185,8 +186,10 @@ async function run() {
     process.env.GITHUB_TOKEN = githubToken;
     process.env.GH_TOKEN = githubToken;
 
-    // Check write permissions (only for entity contexts)
-    if (isEntityContext(context)) {
+    // Check write permissions for entity contexts, and for workflow_run
+    // events, whose upstream run may have been started by an actor without
+    // write access (e.g. the author of a fork pull request)
+    if (isEntityContext(context) || isWorkflowRunEvent(context)) {
       const hasWritePermissions = await checkWritePermissions(
         octokit.rest,
         context,
@@ -318,7 +321,8 @@ async function run() {
   } finally {
     // Phase 4: Cleanup (always runs)
 
-    // Stop refreshing the workload identity token file
+    // Stop refreshing the workload identity token file and delete the token
+    // material so it doesn't outlive this step
     workloadIdentity?.stop();
 
     // Update tracking comment
